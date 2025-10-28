@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: 'Deep Dive',
   description: 'A deep dive into Amazonian jungle of Seattle',
   generator: 'Deep Dive',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({

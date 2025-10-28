@@ -22,10 +22,10 @@ export const DIMENSIONS = {
 export const COLORS = {
   // Primary Theme - Modern Seattle/Tech inspired
   primary: {
-    main: '#2563eb',      // Modern blue
-    light: '#3b82f6',     // Light blue
-    dark: '#1d4ed8',      // Dark blue
-    glow: 'rgba(37, 99, 235, 0.6)'
+    main: '#06b6d4',      // Cyan
+    light: '#22d3ee',     // Light cyan
+    dark: '#0891b2',      // Dark cyan
+    glow: 'rgba(6, 182, 212, 0.6)'
   },
   secondary: {
     main: '#10b981',      // Emerald green
@@ -76,9 +76,9 @@ export const ASSET_URLS = {
     "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/8-gkhiN6iBVr2DY7SqrTZIEP7Q3doyo9.png",
     "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/9-PxwOSLzHQAiMeneqctp2q5mzWAv0Kv.png",
   ],
-  gameOver: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/gameover-NwA13AFRtIFat9QoA12T3lpjK76Qza.png",
-  message: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/message-g1ru4NKF3KrKoFmiVpzR8fwdeLhwNa.png",
-  pipe: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/pipe-green-zrz2zTtoVXaLn6xDqgrNVF9luzjW1B.png",
+  gameOver: "/gameover.png",
+  message: "/message.png",
+  pipe: "/pipe.png",
   audio: {
     point: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/point-SdTORahWMlxujnLCoDbujDLHI6KFeC.wav",
     hit: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/hit-YVMFYQJEgZASG6O3xPWiyiqPtOLygb.wav",

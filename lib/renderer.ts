@@ -7,6 +7,7 @@ export class Renderer {
   private assets: GameAssets
 
   constructor(canvas: HTMLCanvasElement, assets: GameAssets) {
+    console.log("Renderer constructor - canvas:", canvas, "assets:", assets)
     const ctx = canvas.getContext("2d", {
       alpha: false,
       desynchronized: true,
@@ -16,9 +17,14 @@ export class Renderer {
       throw new Error("Could not get 2D context from canvas")
     }
     
+    console.log("Canvas context obtained:", ctx)
     this.ctx = ctx
     this.canvas = canvas
     this.assets = assets
+    
+    // Force initial clear and test render
+    this.clearCanvas()
+    console.log("Canvas cleared, dimensions:", canvas.width, "x", canvas.height)
   }
 
   getContext(): CanvasRenderingContext2D {
@@ -44,10 +50,19 @@ export class Renderer {
   }
 
   renderParallaxBackground(backgroundOffset: number): void {
-    if (!this.assets.background) return
-
     const bgWidth = this.canvas.width
     const bgHeight = this.canvas.height
+    
+    // Fallback gradient background if image fails to load
+    if (!this.assets.background) {
+      const gradient = this.ctx.createLinearGradient(0, 0, 0, bgHeight)
+      gradient.addColorStop(0, '#87CEEB') // Sky blue
+      gradient.addColorStop(0.7, '#98D8E8') // Light blue
+      gradient.addColorStop(1, '#B0E0E6') // Powder blue
+      this.ctx.fillStyle = gradient
+      this.ctx.fillRect(0, 0, bgWidth, bgHeight)
+      return
+    }
     
     // Far background (slowest)
     const farOffset = backgroundOffset * 0.2
@@ -103,7 +118,7 @@ export class Renderer {
     this.ctx.textAlign = 'center'
     this.ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
     this.ctx.shadowBlur = 4
-    this.ctx.fillText("Tap to Start", this.canvas.width / 2, this.canvas.height - 60)
+    this.ctx.fillText("TAP TO START", this.canvas.width / 2, this.canvas.height - 60)
     this.ctx.textAlign = 'start'
     this.ctx.shadowBlur = 0
   }
@@ -162,11 +177,11 @@ export class Renderer {
     this.ctx.fill()
     this.ctx.restore()
 
-    // Add drop shadow
+    // Add larger drop shadow
     this.ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
-    this.ctx.shadowBlur = 4
-    this.ctx.shadowOffsetX = 2
-    this.ctx.shadowOffsetY = 2
+    this.ctx.shadowBlur = 15
+    this.ctx.shadowOffsetX = 6
+    this.ctx.shadowOffsetY = 6
 
     // Draw dark outline
     this.ctx.globalCompositeOperation = 'source-over'
@@ -300,23 +315,41 @@ export class Renderer {
       this.ctx.stroke()
       this.ctx.globalAlpha = 1
       
-      // Modern typography for button text
-      this.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
-      this.ctx.shadowBlur = 2
-      this.ctx.shadowOffsetY = 1
+      // Draw restart icon (circular arrow)
+      const iconSize = 20
+      const iconX = this.canvas.width / 2
+      const iconY = buttonY + buttonHeight / 2
+      
+      this.ctx.strokeStyle = COLORS.neutral.white
       this.ctx.fillStyle = COLORS.neutral.white
-      this.ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
-      this.ctx.textAlign = 'center'
-      this.ctx.fillText("Restart", this.canvas.width / 2, buttonY + buttonHeight / 2 + 7)
-      this.ctx.textAlign = 'start'
-      this.ctx.shadowBlur = 0
-      this.ctx.shadowOffsetY = 0
+      this.ctx.lineWidth = 2.5
+      this.ctx.lineCap = 'round'
+      this.ctx.lineJoin = 'round'
+      
+      // Draw circular arrow path (restart icon)
+      this.ctx.beginPath()
+      // Main circular arc
+      this.ctx.arc(iconX, iconY, iconSize * 0.4, -Math.PI * 0.2, Math.PI * 1.5, false)
+      this.ctx.stroke()
+      
+      // Arrow head
+      const arrowX = iconX + iconSize * 0.35
+      const arrowY = iconY - iconSize * 0.2
+      this.ctx.beginPath()
+      this.ctx.moveTo(arrowX - 4, arrowY - 4)
+      this.ctx.lineTo(arrowX + 2, arrowY)
+      this.ctx.lineTo(arrowX - 4, arrowY + 4)
+      this.ctx.stroke()
+      
+      // Reset line properties
+      this.ctx.lineCap = 'butt'
+      this.ctx.lineJoin = 'miter'
       
       // Final score display
       this.ctx.fillStyle = COLORS.neutral.light
       this.ctx.font = "16px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
       this.ctx.textAlign = 'center'
-      this.ctx.fillText(`Final Score: ${score}`, this.canvas.width / 2, gameOverY - 10)
+      this.ctx.fillText(`FINAL SCORE: ${score}`, this.canvas.width / 2, gameOverY - 10)
       this.ctx.textAlign = 'start'
     }
   }

@@ -61,8 +61,10 @@ export default function SkyDash() {
   useEffect(() => {
     const loadAssets = async () => {
       try {
+        console.log("Starting asset loading...")
         const { assets, audioBuffers } = await assetManagerRef.current.loadAllAssets()
         
+        console.log("Assets loaded:", assets)
         assetsRef.current = assets
         audioBuffersRef.current = audioBuffers
         
@@ -75,9 +77,11 @@ export default function SkyDash() {
         // Initialize renderer
         const canvas = canvasRef.current
         if (canvas) {
+          console.log("Initializing renderer with canvas:", canvas)
           rendererRef.current = new Renderer(canvas, assets)
         }
         
+        console.log("All assets loaded successfully")
         setAssetsLoaded(true)
       } catch (error) {
         console.error("Asset loading error:", error)
@@ -314,42 +318,21 @@ export default function SkyDash() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 overflow-hidden">
-      {!assetsLoaded && !loadingError && (
-        <div className="text-center">
-          <div className="text-2xl font-bold mb-4">Loading Sky Dash...</div>
-          <div className="animate-pulse text-gray-600">Please wait</div>
-        </div>
-      )}
-      {loadingError && (
-        <div className="text-center p-4 max-w-md">
-          <div className="text-2xl font-bold mb-4 text-red-600">Loading Error</div>
-          <div className="text-gray-700 mb-4">{loadingError}</div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-      {assetsLoaded && (
-        <>
-          <canvas
-            ref={canvasRef}
-            width={DIMENSIONS.CANVAS_WIDTH}
-            height={DIMENSIONS.CANVAS_HEIGHT}
-            className="border border-gray-300 touch-none md:border"
-            style={{
-              transform: `scale(${scale})`,
-              transformOrigin: "center center",
-              imageRendering: "pixelated",
-            }}
-            onClick={handleCanvasClick}
-            onTouchStart={handleTouchStart}
-          />
-          <p className="hidden md:block mt-4 text-lg text-center px-4">Tap to soar or press Space to dash through the sky</p>
-        </>
-      )}
+      <canvas
+        ref={canvasRef}
+        width={DIMENSIONS.CANVAS_WIDTH}
+        height={DIMENSIONS.CANVAS_HEIGHT}
+        className="border border-gray-300 touch-none md:border"
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: "center center",
+          imageRendering: "pixelated",
+          backgroundColor: "#87CEEB"
+        }}
+        onClick={handleCanvasClick}
+        onTouchStart={handleTouchStart}
+      />
+      {/* <p className="hidden md:block mt-4 text-lg text-center px-4">Tap to soar or press Space to dash through the sky</p> */}
     </div>
   )
 }
