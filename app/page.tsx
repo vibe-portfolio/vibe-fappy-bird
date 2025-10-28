@@ -1,9 +1,9 @@
-import SkyDash from "../sky-dash"
+import FappyBird from "../sky-dash"
 
 export default function Page() {
   return (
     <div>
-      <SkyDash />
+      <FappyBird />
     </div>
   )
 }

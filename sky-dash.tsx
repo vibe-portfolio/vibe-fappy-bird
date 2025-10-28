@@ -13,7 +13,7 @@ import { Renderer } from './lib/renderer'
 import { ShareUtils } from './lib/shareUtils'
 import type { GameState, GameAssets, AudioBuffers } from './lib/types'
 
-export default function SkyDash() {
+export default function FappyBird() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [assetsLoaded, setAssetsLoaded] = useState(false)
   const [loadingError, setLoadingError] = useState<string | null>(null)

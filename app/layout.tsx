@@ -5,9 +5,9 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Deep Dive',
-  description: 'A deep dive into Amazonian jungle of Seattle',
-  generator: 'Deep Dive',
+  title: 'Fappy Bird',
+  description: 'A fappy bird game in the Amazonian jungle of Seattle',
+  generator: 'Fappy Bird',
   icons: {
     icon: '/favicon.ico',
   },

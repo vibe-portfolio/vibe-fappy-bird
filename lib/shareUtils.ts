@@ -13,20 +13,20 @@ export class ShareUtils {
 
   static generateShareText(score: number): string {
     const messages = [
-      `Just scored ${score} in Sky Dash! 🚀 Can you beat me?`,
-      `${score} points in Sky Dash! 🎮 Think you can do better?`,
-      `Sky Dash high score: ${score}! 🏆 Your turn to fly!`,
-      `Crashed at ${score} points in Sky Dash! 💥 Beat that!`,
-      `${score} points and counting! 🌟 Play Sky Dash now!`
+      `Just scored ${score} in Fappy Bird! 🚀 Can you beat me?`,
+      `${score} points in Fappy Bird! 🎮 Think you can do better?`,
+      `Fappy Bird high score: ${score}! 🏆 Your turn to fly!`,
+      `Crashed at ${score} points in Fappy Bird! 💥 Beat that!`,
+      `${score} points and counting! 🌟 Play Fappy Bird now!`
     ]
     
     // Add special messages for milestone scores
     if (score >= 100) {
-      return `🔥 CENTURY CLUB! Just hit ${score} points in Sky Dash! Who's next? 🔥`
+      return `🔥 CENTURY CLUB! Just hit ${score} points in Fappy Bird! Who's next? 🔥`
     } else if (score >= 50) {
-      return `💪 Half-century! ${score} points in Sky Dash! Can you join the club? 💪`
+      return `💪 Half-century! ${score} points in Fappy Bird! Can you join the club? 💪`
     } else if (score >= 25) {
-      return `🎯 Getting good! ${score} points in Sky Dash! Your move! 🎯`
+      return `🎯 Getting good! ${score} points in Fappy Bird! Your move! 🎯`
     }
     
     return messages[Math.floor(Math.random() * messages.length)]
@@ -41,10 +41,10 @@ export class ShareUtils {
       if (navigator.share) {
         try {
           const screenshot = await this.captureCanvasScreenshot(canvas)
-          const file = new File([screenshot], 'sky-dash-score.png', { type: 'image/png' })
+          const file = new File([screenshot], 'fappy-bird-score.png', { type: 'image/png' })
           
           await navigator.share({
-            title: 'Sky Dash - High Score!',
+            title: 'Fappy Bird - High Score!',
             text: shareText,
             url: gameUrl,
             files: [file]
@@ -54,7 +54,7 @@ export class ShareUtils {
           console.log('Web Share API failed, falling back to text share:', shareError)
           // Fallback to text-only share
           await navigator.share({
-            title: 'Sky Dash - High Score!',
+            title: 'Fappy Bird - High Score!',
             text: shareText,
             url: gameUrl
           })
