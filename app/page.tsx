@@ -1,4 +1,4 @@
-import FappyBird from "../sky-dash"
+import FappyBird from "../fappybird"
 
 export default function Page() {
   return (

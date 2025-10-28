@@ -332,7 +332,7 @@ export default function FappyBird() {
         return
       }
       
-      // Check share button
+      // Check share buttons
       if (x >= buttons.share.x && x <= buttons.share.x + buttons.share.width && 
           y >= buttons.share.y && y <= buttons.share.y + buttons.share.height) {
         handleShareScore()
