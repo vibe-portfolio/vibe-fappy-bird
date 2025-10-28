@@ -31,13 +31,29 @@ interface Pipe {
   scored: boolean
 }
 
+interface Particle {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  life: number
+  maxLife: number
+  size: number
+  color: string
+  type: 'trail' | 'explosion' | 'score' | 'jump'
+}
+
 interface GameState {
   bird: Bird
   pipes: Pipe[]
+  particles: Particle[]
   score: number
   gameOver: boolean
   gameStarted: boolean
   frameCount: number
+  backgroundOffset: number
+  screenShake: number
+  flashEffect: number
 }
 
 export default function FlappyBird() {
@@ -63,10 +79,14 @@ export default function FlappyBird() {
   const gameStateRef = useRef<GameState>({
     bird: { y: 200, velocity: 0, frame: 0 },
     pipes: [],
+    particles: [],
     score: 0,
     gameOver: false,
     gameStarted: false,
     frameCount: 0,
+    backgroundOffset: 0,
+    screenShake: 0,
+    flashEffect: 0,
   })
 
   const birdImage = useRef<HTMLImageElement | null>(null)
@@ -115,8 +135,7 @@ export default function FlappyBird() {
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/8-gkhiN6iBVr2DY7SqrTZIEP7Q3doyo9.png",
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/9-PxwOSLzHQAiMeneqctp2q5mzWAv0Kv.png",
     ]
-    const backgroundUrl =
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/background-day-rvpnF7CJRMdBNqqBc8Zfzz3QpIfkBG.png"
+    const backgroundUrl = "/seattle-bg.png"
     const gameOverUrl =
       "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/gameover-NwA13AFRtIFat9QoA12T3lpjK76Qza.png"
     const messageUrl =
@@ -203,6 +222,26 @@ export default function FlappyBird() {
     pendingSoundsRef.current.add(bufferKey)
   }, [])
 
+  const createParticles = useCallback((x: number, y: number, type: Particle['type'], count: number = 5) => {
+    const particles: Particle[] = []
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5
+      const speed = type === 'explosion' ? 3 + Math.random() * 2 : 1 + Math.random()
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: type === 'trail' ? 30 : type === 'explosion' ? 60 : 40,
+        maxLife: type === 'trail' ? 30 : type === 'explosion' ? 60 : 40,
+        size: type === 'explosion' ? 3 + Math.random() * 2 : type === 'trail' ? 2 : 3,
+        color: type === 'explosion' ? '#ff4444' : type === 'score' ? '#44ff44' : type === 'jump' ? '#4444ff' : '#ffff44',
+        type
+      })
+    }
+    return particles
+  }, [])
+
   const jump = useCallback(() => {
     const state = gameStateRef.current
     const now = Date.now()
@@ -226,21 +265,28 @@ export default function FlappyBird() {
     if (!state.gameOver && state.gameStarted) {
       state.bird.velocity = -JUMP_STRENGTH
       playSoundImmediately("wing")
+      // Add jump particles
+      const jumpParticles = createParticles(50 + BIRD_WIDTH/2, state.bird.y + BIRD_HEIGHT/2, 'jump', 3)
+      state.particles.push(...jumpParticles)
     } else if (!state.gameStarted) {
       state.gameStarted = true
       setIsGameStarted(true)
       lastFrameTimeRef.current = 0
     }
-  }, [playSoundImmediately])
+  }, [playSoundImmediately, createParticles])
 
   const restartGame = useCallback(() => {
     gameStateRef.current = {
       bird: { y: 200, velocity: 0, frame: 0 },
       pipes: [],
+      particles: [],
       score: 0,
       gameOver: false,
       gameStarted: true,
       frameCount: 0,
+      backgroundOffset: 0,
+      screenShake: 0,
+      flashEffect: 0,
     }
     setIsGameOver(false)
     setIsGameStarted(true)
@@ -297,12 +343,50 @@ export default function FlappyBird() {
       deltaTime = Math.min(deltaTime, MAX_DELTA_TIME)
       lastFrameTimeRef.current = currentTime
 
+      // Update screen shake and flash effects
+      if (state.screenShake > 0) {
+        state.screenShake = Math.max(0, state.screenShake - 0.5)
+      }
+      if (state.flashEffect > 0) {
+        state.flashEffect = Math.max(0, state.flashEffect - 0.05)
+      }
+
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      // Draw background
+      // Apply screen shake
+      const shakeX = state.screenShake > 0 ? (Math.random() - 0.5) * state.screenShake : 0
+      const shakeY = state.screenShake > 0 ? (Math.random() - 0.5) * state.screenShake : 0
+      ctx.save()
+      ctx.translate(shakeX, shakeY)
+
+      // Update background offset for parallax
+      if (state.gameStarted && !state.gameOver) {
+        state.backgroundOffset -= PIPE_SPEED * deltaTime * 0.3
+      }
+
+      // Draw parallax background layers
       if (backgroundImage.current) {
-        ctx.drawImage(backgroundImage.current, 0, 0, canvas.width, canvas.height)
+        const bgWidth = canvas.width
+        const bgHeight = canvas.height
+        
+        // Far background (slowest)
+        const farOffset = state.backgroundOffset * 0.2
+        ctx.drawImage(backgroundImage.current, farOffset % bgWidth - bgWidth, 0, bgWidth, bgHeight)
+        ctx.drawImage(backgroundImage.current, farOffset % bgWidth, 0, bgWidth, bgHeight)
+        ctx.drawImage(backgroundImage.current, farOffset % bgWidth + bgWidth, 0, bgWidth, bgHeight)
+        
+        // Mid background
+        const midOffset = state.backgroundOffset * 0.5
+        ctx.globalAlpha = 0.7
+        ctx.drawImage(backgroundImage.current, midOffset % bgWidth - bgWidth, 0, bgWidth, bgHeight)
+        ctx.drawImage(backgroundImage.current, midOffset % bgWidth, 0, bgWidth, bgHeight)
+        ctx.drawImage(backgroundImage.current, midOffset % bgWidth + bgWidth, 0, bgWidth, bgHeight)
+        ctx.globalAlpha = 1
+        
+        // Add dark overlay for better visibility
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
       }
 
       if (!state.gameStarted) {
@@ -326,6 +410,12 @@ export default function FlappyBird() {
         state.frameCount++
         if (state.frameCount % 5 === 0) {
           state.bird.frame = (state.bird.frame + 1) % 3
+        }
+
+        // Add bird trail particles
+        if (state.frameCount % 3 === 0) {
+          const trailParticles = createParticles(50 + BIRD_WIDTH/2 - 10, state.bird.y + BIRD_HEIGHT/2, 'trail', 1)
+          state.particles.push(...trailParticles)
         }
 
         // Move pipes with delta time
@@ -360,6 +450,11 @@ export default function FlappyBird() {
             pipe.scored = true
             state.score++
             queueSound("point")
+            // Add score particles
+            const scoreParticles = createParticles(pipe.x + PIPE_WIDTH, pipe.topHeight + PIPE_GAP/2, 'score', 8)
+            state.particles.push(...scoreParticles)
+            // Flash effect
+            state.flashEffect = 0.3
           }
 
           // Collision detection
@@ -380,6 +475,12 @@ export default function FlappyBird() {
             state.gameOver = true
             setIsGameOver(true)
             queueSound("hit")
+            // Add explosion particles
+            const explosionParticles = createParticles(birdRect.x + birdRect.width/2, birdRect.y + birdRect.height/2, 'explosion', 15)
+            state.particles.push(...explosionParticles)
+            // Screen shake
+            state.screenShake = 8
+            state.flashEffect = 0.5
             break
           }
 
@@ -392,6 +493,12 @@ export default function FlappyBird() {
             state.gameOver = true
             setIsGameOver(true)
             queueSound("hit")
+            // Add explosion particles
+            const explosionParticles = createParticles(birdRect.x + birdRect.width/2, birdRect.y + birdRect.height/2, 'explosion', 15)
+            state.particles.push(...explosionParticles)
+            // Screen shake
+            state.screenShake = 8
+            state.flashEffect = 0.5
             break
           }
         }
@@ -401,12 +508,40 @@ export default function FlappyBird() {
           state.gameOver = true
           setIsGameOver(true)
           queueSound("hit")
+          // Add explosion particles
+          const explosionParticles = createParticles(50 + BIRD_WIDTH/2, state.bird.y + BIRD_HEIGHT/2, 'explosion', 15)
+          state.particles.push(...explosionParticles)
+          // Screen shake
+          state.screenShake = 8
+          state.flashEffect = 0.5
         }
       }
 
-      // Draw pipes
+      // Update particles
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const particle = state.particles[i]
+        particle.x += particle.vx * deltaTime
+        particle.y += particle.vy * deltaTime
+        particle.life -= deltaTime
+        
+        // Add gravity to explosion particles
+        if (particle.type === 'explosion') {
+          particle.vy += 0.1 * deltaTime
+        }
+        
+        // Remove dead particles
+        if (particle.life <= 0) {
+          state.particles.splice(i, 1)
+        }
+      }
+
+      // Draw pipes with glow effect
       for (const pipe of state.pipes) {
         if (pipeImage.current) {
+          // Add glow effect
+          ctx.shadowColor = 'rgba(0, 255, 0, 0.3)'
+          ctx.shadowBlur = 10
+          
           // Draw top pipe (flipped vertically)
           ctx.save()
           ctx.scale(1, -1)
@@ -415,34 +550,104 @@ export default function FlappyBird() {
 
           // Draw bottom pipe
           ctx.drawImage(pipeImage.current, pipe.x, pipe.topHeight + PIPE_GAP, PIPE_WIDTH, 320)
+          
+          // Reset shadow
+          ctx.shadowBlur = 0
         }
       }
+
+      // Draw particles
+      for (const particle of state.particles) {
+        const alpha = particle.life / particle.maxLife
+        ctx.globalAlpha = alpha
+        
+        ctx.fillStyle = particle.color
+        ctx.beginPath()
+        ctx.arc(particle.x, particle.y, particle.size * alpha, 0, Math.PI * 2)
+        ctx.fill()
+        
+        // Add glow for certain particle types
+        if (particle.type === 'score' || particle.type === 'explosion') {
+          ctx.shadowColor = particle.color
+          ctx.shadowBlur = 5
+          ctx.beginPath()
+          ctx.arc(particle.x, particle.y, particle.size * alpha * 0.5, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.shadowBlur = 0
+        }
+      }
+      ctx.globalAlpha = 1
 
       if (birdImage.current) {
         ctx.save()
         ctx.translate(50 + BIRD_WIDTH / 2, state.bird.y + BIRD_HEIGHT / 2)
         ctx.rotate(Math.min(Math.PI / 4, Math.max(-Math.PI / 4, state.bird.velocity * 0.1)))
 
-        // Create circular clipping path
+        // Add drop shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
+        ctx.shadowBlur = 4
+        ctx.shadowOffsetX = 2
+        ctx.shadowOffsetY = 2
+
+        // Draw dark outline by drawing the image multiple times slightly offset
+        ctx.globalCompositeOperation = 'source-over'
+        const outlineSize = 2
+        
+        // Draw outline in 8 directions
+        for (let x = -outlineSize; x <= outlineSize; x++) {
+          for (let y = -outlineSize; y <= outlineSize; y++) {
+            if (x !== 0 || y !== 0) {
+              ctx.save()
+              ctx.beginPath()
+              ctx.arc(x, y, BIRD_WIDTH / 2, 0, Math.PI * 2)
+              ctx.clip()
+              ctx.filter = 'brightness(0)' // Make it black for outline
+              ctx.drawImage(birdImage.current, -BIRD_WIDTH / 2 + x, -BIRD_HEIGHT / 2 + y, BIRD_WIDTH, BIRD_HEIGHT)
+              ctx.restore()
+            }
+          }
+        }
+
+        // Draw the actual bird on top
+        ctx.filter = 'none'
         ctx.beginPath()
         ctx.arc(0, 0, BIRD_WIDTH / 2, 0, Math.PI * 2)
         ctx.clip()
-
         ctx.drawImage(birdImage.current, -BIRD_WIDTH / 2, -BIRD_HEIGHT / 2, BIRD_WIDTH, BIRD_HEIGHT)
+        
         ctx.restore()
       }
 
-      // Draw score
+      // Draw score with enhanced styling
       const scoreString = state.score.toString()
       const digitWidth = 24
       const totalWidth = scoreString.length * digitWidth
       const startX = (canvas.width - totalWidth) / 2
+      
+      // Add background for score
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+      ctx.fillRect(startX - 10, 15, totalWidth + 20, 46)
+      
+      // Add glow effect for score
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.8)'
+      ctx.shadowBlur = 5
+      
       for (let i = 0; i < scoreString.length; i++) {
         const digitImage = numberSprites.current[Number.parseInt(scoreString[i])]
         if (digitImage) {
           ctx.drawImage(digitImage, startX + i * digitWidth, 20, digitWidth, 36)
         }
       }
+      ctx.shadowBlur = 0
+
+      // Apply flash effect
+      if (state.flashEffect > 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${state.flashEffect})`
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+      }
+
+      // Restore transform (remove screen shake)
+      ctx.restore()
 
       if (state.gameOver) {
         if (gameOverImage.current) {
@@ -450,14 +655,33 @@ export default function FlappyBird() {
           const gameOverHeight = 42
           const gameOverX = (canvas.width - gameOverWidth) / 2
           const gameOverY = (canvas.height - gameOverHeight) / 2
+          
+          // Add glow to game over text
+          ctx.shadowColor = 'rgba(255, 0, 0, 0.8)'
+          ctx.shadowBlur = 10
           ctx.drawImage(gameOverImage.current, gameOverX, gameOverY, gameOverWidth, gameOverHeight)
+          ctx.shadowBlur = 0
 
-          // Draw Restart button
-          ctx.fillStyle = "rgba(0, 0, 0, 0.5)"
+          // Enhanced Restart button
+          const buttonGradient = ctx.createLinearGradient(canvas.width / 2 - 50, canvas.height / 2 + 50, canvas.width / 2 - 50, canvas.height / 2 + 90)
+          buttonGradient.addColorStop(0, 'rgba(0, 150, 255, 0.8)')
+          buttonGradient.addColorStop(1, 'rgba(0, 100, 200, 0.8)')
+          
+          ctx.fillStyle = buttonGradient
           ctx.fillRect(canvas.width / 2 - 50, canvas.height / 2 + 50, 100, 40)
+          
+          // Button border
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'
+          ctx.lineWidth = 2
+          ctx.strokeRect(canvas.width / 2 - 50, canvas.height / 2 + 50, 100, 40)
+          
+          // Button text with shadow
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
+          ctx.shadowBlur = 2
           ctx.fillStyle = "white"
-          ctx.font = "20px Arial"
-          ctx.fillText("Restart", canvas.width / 2 - 30, canvas.height / 2 + 75)
+          ctx.font = "bold 18px Arial"
+          ctx.fillText("Restart", canvas.width / 2 - 28, canvas.height / 2 + 75)
+          ctx.shadowBlur = 0
         }
       }
 
@@ -467,7 +691,7 @@ export default function FlappyBird() {
     animationFrameId = requestAnimationFrame(gameLoop)
 
     return () => cancelAnimationFrame(animationFrameId)
-  }, [assetsLoaded, playSoundImmediately, queueSound])
+  }, [assetsLoaded, playSoundImmediately, queueSound, createParticles])
 
   const handleCanvasClick = useCallback(
     (event: React.MouseEvent<HTMLCanvasElement>) => {
