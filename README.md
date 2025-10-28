@@ -1,2 +1,3 @@
 vibes
-<img width="342" height="623" alt="Screenshot 2025-10-06 at 9 10 07 AM" src="https://github.com/user-attachments/assets/c6d5b823-b1d1-4873-9c65-aebb4efed565" />
+
+<img width="267" height="474" alt=" 2025-10-28 at 2 17 03 PM" src="https://github.com/user-attachments/assets/3f021563-0e2f-416c-9531-f5e57151b73e" />
