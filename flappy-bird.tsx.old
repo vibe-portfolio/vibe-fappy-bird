@@ -3,60 +3,16 @@
 import type React from "react"
 import { useEffect, useRef, useState, useCallback } from "react"
 
-// Recalibrated constants for time-based physics
-const GRAVITY = 0.3
-const JUMP_STRENGTH = 7.5
-const PIPE_WIDTH = 52
-const PIPE_GAP = 150
-const PIPE_SPEED = 2
-const BIRD_WIDTH = 40
-const BIRD_HEIGHT = 40
-const TARGET_FPS = 60
-const MAX_DELTA_TIME = 1 // Clamp delta time to prevent huge jumps
-const JUMP_COOLDOWN = 200 // milliseconds between jumps
+// Import modular components
+import { PHYSICS, DIMENSIONS, COLORS } from './lib/config'
+import { AssetManager } from './lib/assetManager'
+import { AudioManager } from './lib/audioManager'
+import { ParticleSystem } from './lib/particleSystem'
+import { GameLogic } from './lib/gameLogic'
+import { Renderer } from './lib/renderer'
+import type { GameState, GameAssets, AudioBuffers } from './lib/types'
 
-// Fixed canvas dimensions
-const CANVAS_WIDTH = 288
-const CANVAS_HEIGHT = 512
-
-interface Bird {
-  y: number
-  velocity: number
-  frame: number
-}
-
-interface Pipe {
-  x: number
-  topHeight: number
-  scored: boolean
-}
-
-interface Particle {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  life: number
-  maxLife: number
-  size: number
-  color: string
-  type: 'trail' | 'explosion' | 'score' | 'jump'
-}
-
-interface GameState {
-  bird: Bird
-  pipes: Pipe[]
-  particles: Particle[]
-  score: number
-  gameOver: boolean
-  gameStarted: boolean
-  frameCount: number
-  backgroundOffset: number
-  screenShake: number
-  flashEffect: number
-}
-
-export default function FlappyBird() {
+export default function SkyDash() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [assetsLoaded, setAssetsLoaded] = useState(false)
   const [loadingError, setLoadingError] = useState<string | null>(null)
@@ -64,45 +20,28 @@ export default function FlappyBird() {
   const [isGameStarted, setIsGameStarted] = useState(false)
   const [scale, setScale] = useState(1)
 
+  // Game system instances
+  const assetManagerRef = useRef<AssetManager>(new AssetManager())
+  const audioManagerRef = useRef<AudioManager | null>(null)
+  const particleSystemRef = useRef<ParticleSystem>(new ParticleSystem())
+  const rendererRef = useRef<Renderer | null>(null)
+  
+  // Game state and timing
+  const gameStateRef = useRef<GameState>(GameLogic.createInitialGameState())
   const lastFrameTimeRef = useRef<number>(0)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const audioBuffersRef = useRef<{
-    point?: AudioBuffer
-    hit?: AudioBuffer
-    wing?: AudioBuffer
-  }>({})
-
   const lastJumpTimeRef = useRef<number>(0)
-  const pendingSoundsRef = useRef<Set<"point" | "hit" | "wing">>(new Set())
-
-  // Use refs for game state to avoid re-renders
-  const gameStateRef = useRef<GameState>({
-    bird: { y: 200, velocity: 0, frame: 0 },
-    pipes: [],
-    particles: [],
-    score: 0,
-    gameOver: false,
-    gameStarted: false,
-    frameCount: 0,
-    backgroundOffset: 0,
-    screenShake: 0,
-    flashEffect: 0,
-  })
-
-  const birdImage = useRef<HTMLImageElement | null>(null)
-  const backgroundImage = useRef<HTMLImageElement | null>(null)
-  const numberSprites = useRef<HTMLImageElement[]>([])
-  const gameOverImage = useRef<HTMLImageElement | null>(null)
-  const messageImage = useRef<HTMLImageElement | null>(null)
-  const pipeImage = useRef<HTMLImageElement | null>(null)
+  
+  // Assets
+  const assetsRef = useRef<GameAssets | null>(null)
+  const audioBuffersRef = useRef<AudioBuffers | null>(null)
 
   // Calculate scale for mobile to fill screen while maintaining aspect ratio
   useEffect(() => {
     const updateScale = () => {
       if (window.innerWidth < 768) {
         // Mobile view - scale to fit screen
-        const scaleX = window.innerWidth / CANVAS_WIDTH
-        const scaleY = window.innerHeight / CANVAS_HEIGHT
+        const scaleX = window.innerWidth / DIMENSIONS.CANVAS_WIDTH
+        const scaleY = window.innerHeight / DIMENSIONS.CANVAS_HEIGHT
         // Use the larger scale to ensure full coverage
         setScale(Math.max(scaleX, scaleY))
       } else {
@@ -121,125 +60,48 @@ export default function FlappyBird() {
     }
   }, [])
 
+  // Load all game assets
   useEffect(() => {
-    const birdUrl = "/ellehong.jpeg"
-    const numberUrls = [
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/0-n6uJmiEzXXFf0NDHejRxdna8JdqZ9P.png",
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/1-2s71zdNWUSfnqIUbOABB2QJzzbG7fR.png",
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/2-QNpaMYRZvP9MgObyqVbxo7wu0MyjYE.png",
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/3-6yXb5a7IxZyl8kdXXBatpxq48enb2d.png",
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/4-9beOrHBy4QSBLifUwqaLXqbNWfK4Hr.png",
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/5-pgAY4wiTYa2Ppho9w3YXtLx3UHryJI.png",
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/6-5v6snji9HWY7UpBuqDkKDtck2zED4B.png",
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/7-zTxqP8uIOG4OYFtl8x6Dby0mqKfNYo.png",
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/8-gkhiN6iBVr2DY7SqrTZIEP7Q3doyo9.png",
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/9-PxwOSLzHQAiMeneqctp2q5mzWAv0Kv.png",
-    ]
-    const backgroundUrl = "/seattle-bg.png"
-    const gameOverUrl =
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/gameover-NwA13AFRtIFat9QoA12T3lpjK76Qza.png"
-    const messageUrl =
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/message-g1ru4NKF3KrKoFmiVpzR8fwdeLhwNa.png"
-    const pipeUrl =
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/pipe-green-zrz2zTtoVXaLn6xDqgrNVF9luzjW1B.png"
-
-    const loadImage = (url: string) =>
-      new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image()
-        img.crossOrigin = "anonymous"
-        img.onload = () => resolve(img)
-        img.onerror = () => reject(new Error(`Failed to load image: ${url}`))
-        img.src = url
-      })
-
-    const loadAudioBuffer = async (url: string): Promise<AudioBuffer> => {
-      const response = await fetch(url)
-      const arrayBuffer = await response.arrayBuffer()
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
-      const audioContext = audioContextRef.current || new AudioContextClass()
-      audioContextRef.current = audioContext
-      return await audioContext.decodeAudioData(arrayBuffer)
-    }
-
-    Promise.all([
-      loadImage(birdUrl),
-      ...numberUrls.map(loadImage),
-      loadImage(backgroundUrl),
-      loadImage(gameOverUrl),
-      loadImage(messageUrl),
-      loadImage(pipeUrl),
-      loadAudioBuffer(
-        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/point-SdTORahWMlxujnLCoDbujDLHI6KFeC.wav",
-      ).then((buffer) => {
-        audioBuffersRef.current.point = buffer
-        return buffer
-      }),
-      loadAudioBuffer(
-        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/hit-YVMFYQJEgZASG6O3xPWiyiqPtOLygb.wav",
-      ).then((buffer) => {
-        audioBuffersRef.current.hit = buffer
-        return buffer
-      }),
-      loadAudioBuffer(
-        "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/wing-oOSsspXpVMDc0enrWj4WWLaHVqs6Hk.wav",
-      ).then((buffer) => {
-        audioBuffersRef.current.wing = buffer
-        return buffer
-      }),
-    ])
-      .then((loadedAssets) => {
-        birdImage.current = loadedAssets[0] as HTMLImageElement
-        numberSprites.current = loadedAssets.slice(1, 11) as HTMLImageElement[]
-        backgroundImage.current = loadedAssets[11] as HTMLImageElement
-        gameOverImage.current = loadedAssets[12] as HTMLImageElement
-        messageImage.current = loadedAssets[13] as HTMLImageElement
-        pipeImage.current = loadedAssets[14] as HTMLImageElement
-        setAssetsLoaded(true)
-      })
-      .catch((error) => {
-        console.error("Asset loading error:", error)
-        setLoadingError(error.message)
-      })
-  }, [])
-
-  const playSoundImmediately = useCallback((bufferKey: "point" | "hit" | "wing") => {
-    const buffer = audioBuffersRef.current[bufferKey]
-    const audioContext = audioContextRef.current
-
-    if (buffer && audioContext && audioContext.state === "running") {
+    const loadAssets = async () => {
       try {
-        const source = audioContext.createBufferSource()
-        source.buffer = buffer
-        source.connect(audioContext.destination)
-        source.start(0)
+        const { assets, audioBuffers } = await assetManagerRef.current.loadAllAssets()
+        
+        assetsRef.current = assets
+        audioBuffersRef.current = audioBuffers
+        
+        // Initialize audio manager
+        audioManagerRef.current = new AudioManager(
+          assetManagerRef.current.getAudioContext(),
+          audioBuffers
+        )
+        
+        // Initialize renderer
+        const canvas = canvasRef.current
+        if (canvas) {
+          rendererRef.current = new Renderer(canvas, assets)
+        }
+        
+        setAssetsLoaded(true)
       } catch (error) {
-        console.error("Error playing sound:", error)
+        console.error("Asset loading error:", error)
+        setLoadingError(error instanceof Error ? error.message : 'Unknown error')
       }
     }
+
+    loadAssets()
   }, [])
 
-  const queueSound = useCallback((bufferKey: "point" | "hit" | "wing") => {
-    pendingSoundsRef.current.add(bufferKey)
+  // Game control functions
+  const playSoundImmediately = useCallback((soundType: "point" | "hit" | "wing") => {
+    audioManagerRef.current?.playSoundImmediately(soundType)
   }, [])
 
-  const createParticles = useCallback((x: number, y: number, type: Particle['type'], count: number = 5) => {
-    const particles: Particle[] = []
-    for (let i = 0; i < count; i++) {
-      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5
-      const speed = type === 'explosion' ? 3 + Math.random() * 2 : 1 + Math.random()
-      particles.push({
-        x,
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: type === 'trail' ? 30 : type === 'explosion' ? 60 : 40,
-        maxLife: type === 'trail' ? 30 : type === 'explosion' ? 60 : 40,
-        size: type === 'explosion' ? 3 + Math.random() * 2 : type === 'trail' ? 2 : 3,
-        color: type === 'explosion' ? '#ff4444' : type === 'score' ? '#44ff44' : type === 'jump' ? '#4444ff' : '#ffff44',
-        type
-      })
-    }
-    return particles
+  const queueSound = useCallback((soundType: "point" | "hit" | "wing") => {
+    audioManagerRef.current?.queueSound(soundType)
+  }, [])
+
+  const createParticles = useCallback((x: number, y: number, type: 'trail' | 'explosion' | 'score' | 'jump', count: number = 5) => {
+    return particleSystemRef.current.createParticles(x, y, type, count)
   }, [])
 
   const jump = useCallback(() => {
@@ -247,26 +109,19 @@ export default function FlappyBird() {
     const now = Date.now()
 
     // Prevent rapid-fire jumps
-    if (now - lastJumpTimeRef.current < JUMP_COOLDOWN) {
+    if (now - lastJumpTimeRef.current < PHYSICS.JUMP_COOLDOWN) {
       return
     }
     lastJumpTimeRef.current = now
 
-    // Initialize and resume AudioContext on user interaction (required for Safari)
-    if (!audioContextRef.current) {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
-      audioContextRef.current = new AudioContextClass()
-    }
-
-    if (audioContextRef.current.state === "suspended") {
-      audioContextRef.current.resume()
-    }
+    // Initialize audio context on user interaction
+    audioManagerRef.current?.initializeAudioContext()
 
     if (!state.gameOver && state.gameStarted) {
-      state.bird.velocity = -JUMP_STRENGTH
+      GameLogic.jump(state.bird)
       playSoundImmediately("wing")
       // Add jump particles
-      const jumpParticles = createParticles(50 + BIRD_WIDTH/2, state.bird.y + BIRD_HEIGHT/2, 'jump', 3)
+      const jumpParticles = createParticles(50 + DIMENSIONS.BIRD_WIDTH/2, state.bird.y + DIMENSIONS.BIRD_HEIGHT/2, 'jump', 3)
       state.particles.push(...jumpParticles)
     } else if (!state.gameStarted) {
       state.gameStarted = true
@@ -276,18 +131,8 @@ export default function FlappyBird() {
   }, [playSoundImmediately, createParticles])
 
   const restartGame = useCallback(() => {
-    gameStateRef.current = {
-      bird: { y: 200, velocity: 0, frame: 0 },
-      pipes: [],
-      particles: [],
-      score: 0,
-      gameOver: false,
-      gameStarted: true,
-      frameCount: 0,
-      backgroundOffset: 0,
-      screenShake: 0,
-      flashEffect: 0,
-    }
+    gameStateRef.current = GameLogic.createInitialGameState()
+    gameStateRef.current.gameStarted = true
     setIsGameOver(false)
     setIsGameStarted(true)
     lastFrameTimeRef.current = 0
@@ -384,20 +229,50 @@ export default function FlappyBird() {
         ctx.drawImage(backgroundImage.current, midOffset % bgWidth + bgWidth, 0, bgWidth, bgHeight)
         ctx.globalAlpha = 1
         
-        // Add dark overlay for better visibility
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'
+        // Add sophisticated gradient overlay for better visibility and atmosphere
+        const overlayGradient = ctx.createLinearGradient(0, 0, 0, canvas.height)
+        overlayGradient.addColorStop(0, 'rgba(15, 23, 42, 0.2)')  // Very subtle at top
+        overlayGradient.addColorStop(0.7, 'rgba(15, 23, 42, 0.4)') // Stronger at bottom
+        overlayGradient.addColorStop(1, 'rgba(15, 23, 42, 0.6)')   // Strongest at ground level
+        ctx.fillStyle = overlayGradient
         ctx.fillRect(0, 0, canvas.width, canvas.height)
       }
 
       if (!state.gameStarted) {
-        // Draw message
+        // Modern start screen overlay
+        const startOverlayGradient = ctx.createRadialGradient(
+          canvas.width / 2, canvas.height / 2, 0,
+          canvas.width / 2, canvas.height / 2, canvas.width
+        )
+        startOverlayGradient.addColorStop(0, 'rgba(248, 250, 252, 0.1)')
+        startOverlayGradient.addColorStop(1, 'rgba(15, 23, 42, 0.7)')
+        ctx.fillStyle = startOverlayGradient
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        
+        // Draw message with enhanced styling
         if (messageImage.current) {
           const messageWidth = 184
           const messageHeight = 267
           const messageX = (canvas.width - messageWidth) / 2
           const messageY = (canvas.height - messageHeight) / 2
+          
+          // Add glow to start message
+          ctx.shadowColor = COLORS.primary.glow
+          ctx.shadowBlur = 10
           ctx.drawImage(messageImage.current, messageX, messageY, messageWidth, messageHeight)
+          ctx.shadowBlur = 0
         }
+        
+        // Add modern "Tap to Start" text
+        ctx.fillStyle = COLORS.neutral.white
+        ctx.font = "18px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+        ctx.textAlign = 'center'
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
+        ctx.shadowBlur = 4
+        ctx.fillText("Tap to Start", canvas.width / 2, canvas.height - 60)
+        ctx.textAlign = 'start'
+        ctx.shadowBlur = 0
+        
         animationFrameId = requestAnimationFrame(gameLoop)
         return
       }
@@ -535,12 +410,12 @@ export default function FlappyBird() {
         }
       }
 
-      // Draw pipes with glow effect
+      // Draw pipes with modern glow effect
       for (const pipe of state.pipes) {
         if (pipeImage.current) {
-          // Add glow effect
-          ctx.shadowColor = 'rgba(0, 255, 0, 0.3)'
-          ctx.shadowBlur = 10
+          // Add subtle glow effect with theme colors
+          ctx.shadowColor = COLORS.secondary.glow
+          ctx.shadowBlur = 8
           
           // Draw top pipe (flipped vertically)
           ctx.save()
@@ -551,8 +426,18 @@ export default function FlappyBird() {
           // Draw bottom pipe
           ctx.drawImage(pipeImage.current, pipe.x, pipe.topHeight + PIPE_GAP, PIPE_WIDTH, 320)
           
-          // Reset shadow
+          // Add subtle highlight on pipe edges for depth
           ctx.shadowBlur = 0
+          ctx.strokeStyle = COLORS.secondary.light
+          ctx.lineWidth = 1
+          ctx.globalAlpha = 0.3
+          
+          // Top pipe outline
+          ctx.strokeRect(pipe.x, 0, PIPE_WIDTH, pipe.topHeight)
+          // Bottom pipe outline  
+          ctx.strokeRect(pipe.x, pipe.topHeight + PIPE_GAP, PIPE_WIDTH, canvas.height - pipe.topHeight - PIPE_GAP)
+          
+          ctx.globalAlpha = 1
         }
       }
 
@@ -582,6 +467,21 @@ export default function FlappyBird() {
         ctx.save()
         ctx.translate(50 + BIRD_WIDTH / 2, state.bird.y + BIRD_HEIGHT / 2)
         ctx.rotate(Math.min(Math.PI / 4, Math.max(-Math.PI / 4, state.bird.velocity * 0.1)))
+
+        // Add radial shadow beneath the bird
+        const shadowRadius = BIRD_WIDTH * 0.8
+        const shadowGradient = ctx.createRadialGradient(0, BIRD_HEIGHT / 3, 0, 0, BIRD_HEIGHT / 3, shadowRadius)
+        shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)')
+        shadowGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.2)')
+        shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+        
+        ctx.save()
+        ctx.globalCompositeOperation = 'multiply'
+        ctx.fillStyle = shadowGradient
+        ctx.beginPath()
+        ctx.ellipse(0, BIRD_HEIGHT / 3, shadowRadius * 0.8, shadowRadius * 0.4, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
 
         // Add drop shadow
         ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
@@ -618,19 +518,38 @@ export default function FlappyBird() {
         ctx.restore()
       }
 
-      // Draw score with enhanced styling
+      // Draw score with modern design system
       const scoreString = state.score.toString()
       const digitWidth = 24
       const totalWidth = scoreString.length * digitWidth
       const startX = (canvas.width - totalWidth) / 2
+      const padding = 16
+      const borderRadius = 12
       
-      // Add background for score
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
-      ctx.fillRect(startX - 10, 15, totalWidth + 20, 46)
+      // Modern score container with gradient background
+      const scoreGradient = ctx.createLinearGradient(startX - padding, 15, startX - padding, 61)
+      scoreGradient.addColorStop(0, 'rgba(248, 250, 252, 0.95)')  // Light top
+      scoreGradient.addColorStop(1, 'rgba(226, 232, 240, 0.95)')  // Slightly darker bottom
       
-      // Add glow effect for score
-      ctx.shadowColor = 'rgba(255, 255, 255, 0.8)'
-      ctx.shadowBlur = 5
+      // Draw rounded rectangle background
+      ctx.fillStyle = scoreGradient
+      ctx.beginPath()
+      ctx.roundRect(startX - padding, 15, totalWidth + (padding * 2), 46, borderRadius)
+      ctx.fill()
+      
+      // Add subtle border
+      ctx.strokeStyle = COLORS.primary.light
+      ctx.lineWidth = 2
+      ctx.stroke()
+      
+      // Add inner shadow for depth
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.1)'
+      ctx.shadowBlur = 4
+      ctx.shadowOffsetY = 2
+      
+      // Draw score digits with enhanced glow
+      ctx.shadowColor = COLORS.primary.glow
+      ctx.shadowBlur = 8
       
       for (let i = 0; i < scoreString.length; i++) {
         const digitImage = numberSprites.current[Number.parseInt(scoreString[i])]
@@ -639,6 +558,7 @@ export default function FlappyBird() {
         }
       }
       ctx.shadowBlur = 0
+      ctx.shadowOffsetY = 0
 
       // Apply flash effect
       if (state.flashEffect > 0) {
@@ -650,38 +570,77 @@ export default function FlappyBird() {
       ctx.restore()
 
       if (state.gameOver) {
+        // Modern game over overlay
+        const overlayGradient = ctx.createRadialGradient(
+          canvas.width / 2, canvas.height / 2, 0,
+          canvas.width / 2, canvas.height / 2, canvas.width
+        )
+        overlayGradient.addColorStop(0, 'rgba(15, 23, 42, 0.7)')
+        overlayGradient.addColorStop(1, 'rgba(15, 23, 42, 0.9)')
+        ctx.fillStyle = overlayGradient
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+        
         if (gameOverImage.current) {
           const gameOverWidth = 192
           const gameOverHeight = 42
           const gameOverX = (canvas.width - gameOverWidth) / 2
-          const gameOverY = (canvas.height - gameOverHeight) / 2
+          const gameOverY = (canvas.height - gameOverHeight) / 2 - 30
           
-          // Add glow to game over text
-          ctx.shadowColor = 'rgba(255, 0, 0, 0.8)'
-          ctx.shadowBlur = 10
+          // Add dramatic glow to game over text
+          ctx.shadowColor = COLORS.danger.glow
+          ctx.shadowBlur = 15
           ctx.drawImage(gameOverImage.current, gameOverX, gameOverY, gameOverWidth, gameOverHeight)
           ctx.shadowBlur = 0
 
-          // Enhanced Restart button
-          const buttonGradient = ctx.createLinearGradient(canvas.width / 2 - 50, canvas.height / 2 + 50, canvas.width / 2 - 50, canvas.height / 2 + 90)
-          buttonGradient.addColorStop(0, 'rgba(0, 150, 255, 0.8)')
-          buttonGradient.addColorStop(1, 'rgba(0, 100, 200, 0.8)')
+          // Modern restart button with design system
+          const buttonWidth = 120
+          const buttonHeight = 48
+          const buttonX = canvas.width / 2 - buttonWidth / 2
+          const buttonY = canvas.height / 2 + 30
+          const buttonRadius = 12
           
+          // Button gradient using theme colors
+          const buttonGradient = ctx.createLinearGradient(buttonX, buttonY, buttonX, buttonY + buttonHeight)
+          buttonGradient.addColorStop(0, COLORS.primary.light)
+          buttonGradient.addColorStop(1, COLORS.primary.main)
+          
+          // Draw rounded button
           ctx.fillStyle = buttonGradient
-          ctx.fillRect(canvas.width / 2 - 50, canvas.height / 2 + 50, 100, 40)
+          ctx.beginPath()
+          ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, buttonRadius)
+          ctx.fill()
+          
+          // Button glow effect
+          ctx.shadowColor = COLORS.primary.glow
+          ctx.shadowBlur = 12
+          ctx.stroke()
+          ctx.shadowBlur = 0
           
           // Button border
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'
+          ctx.strokeStyle = COLORS.neutral.white
           ctx.lineWidth = 2
-          ctx.strokeRect(canvas.width / 2 - 50, canvas.height / 2 + 50, 100, 40)
+          ctx.globalAlpha = 0.8
+          ctx.stroke()
+          ctx.globalAlpha = 1
           
-          // Button text with shadow
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
+          // Modern typography for button text
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
           ctx.shadowBlur = 2
-          ctx.fillStyle = "white"
-          ctx.font = "bold 18px Arial"
-          ctx.fillText("Restart", canvas.width / 2 - 28, canvas.height / 2 + 75)
+          ctx.shadowOffsetY = 1
+          ctx.fillStyle = COLORS.neutral.white
+          ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+          ctx.textAlign = 'center'
+          ctx.fillText("Restart", canvas.width / 2, buttonY + buttonHeight / 2 + 7)
+          ctx.textAlign = 'start'
           ctx.shadowBlur = 0
+          ctx.shadowOffsetY = 0
+          
+          // Final score display
+          ctx.fillStyle = COLORS.neutral.light
+          ctx.font = "16px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
+          ctx.textAlign = 'center'
+          ctx.fillText(`Final Score: ${state.score}`, canvas.width / 2, gameOverY - 10)
+          ctx.textAlign = 'start'
         }
       }
 
@@ -705,12 +664,17 @@ export default function FlappyBird() {
       const state = gameStateRef.current
 
       if (state.gameOver) {
-        // Check if click is within Restart button area
+        // Check if click is within modern Restart button area
+        const buttonWidth = 120
+        const buttonHeight = 48
+        const buttonX = CANVAS_WIDTH / 2 - buttonWidth / 2
+        const buttonY = CANVAS_HEIGHT / 2 + 30
+        
         if (
-          x >= CANVAS_WIDTH / 2 - 50 &&
-          x <= CANVAS_WIDTH / 2 + 50 &&
-          y >= CANVAS_HEIGHT / 2 + 50 &&
-          y <= CANVAS_HEIGHT / 2 + 90
+          x >= buttonX &&
+          x <= buttonX + buttonWidth &&
+          y >= buttonY &&
+          y <= buttonY + buttonHeight
         ) {
           restartGame()
           return // Exit early to prevent jump
@@ -739,12 +703,17 @@ export default function FlappyBird() {
       const state = gameStateRef.current
 
       if (state.gameOver) {
-        // Check if touch is within Restart button area
+        // Check if touch is within modern Restart button area
+        const buttonWidth = 120
+        const buttonHeight = 48
+        const buttonX = CANVAS_WIDTH / 2 - buttonWidth / 2
+        const buttonY = CANVAS_HEIGHT / 2 + 30
+        
         if (
-          x >= CANVAS_WIDTH / 2 - 50 &&
-          x <= CANVAS_WIDTH / 2 + 50 &&
-          y >= CANVAS_HEIGHT / 2 + 50 &&
-          y <= CANVAS_HEIGHT / 2 + 90
+          x >= buttonX &&
+          x <= buttonX + buttonWidth &&
+          y >= buttonY &&
+          y <= buttonY + buttonHeight
         ) {
           restartGame()
           return // Exit early to prevent jump
@@ -761,7 +730,7 @@ export default function FlappyBird() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 overflow-hidden">
       {!assetsLoaded && !loadingError && (
         <div className="text-center">
-          <div className="text-2xl font-bold mb-4">Loading Flappy Bird...</div>
+          <div className="text-2xl font-bold mb-4">Loading Sky Dash...</div>
           <div className="animate-pulse text-gray-600">Please wait</div>
         </div>
       )}
@@ -792,7 +761,7 @@ export default function FlappyBird() {
             onClick={handleCanvasClick}
             onTouchStart={handleTouchStart}
           />
-          <p className="hidden md:block mt-4 text-lg text-center px-4">Tap to play or press Space to jump</p>
+          <p className="hidden md:block mt-4 text-lg text-center px-4">Tap to soar or press Space to dash through the sky</p>
         </>
       )}
     </div>
