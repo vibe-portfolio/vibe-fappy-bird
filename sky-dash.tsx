@@ -10,6 +10,7 @@ import { AudioManager } from './lib/audioManager'
 import { ParticleSystem } from './lib/particleSystem'
 import { GameLogic } from './lib/gameLogic'
 import { Renderer } from './lib/renderer'
+import { ShareUtils } from './lib/shareUtils'
 import type { GameState, GameAssets, AudioBuffers } from './lib/types'
 
 export default function SkyDash() {
@@ -137,6 +138,22 @@ export default function SkyDash() {
     setIsGameOver(false)
     setIsGameStarted(true)
     lastFrameTimeRef.current = 0
+  }, [])
+
+  const handleShareScore = useCallback(async () => {
+    const canvas = canvasRef.current
+    const state = gameStateRef.current
+    
+    if (!canvas) return
+    
+    try {
+      const success = await ShareUtils.shareScore(canvas, state.score)
+      if (success) {
+        console.log('Score shared successfully!')
+      }
+    } catch (error) {
+      console.error('Failed to share score:', error)
+    }
   }, [])
 
   // Keyboard controls
@@ -270,21 +287,26 @@ export default function SkyDash() {
 
     const state = gameStateRef.current
 
-    if (state.gameOver) {
-      // Check restart button
-      const buttonWidth = 120
-      const buttonHeight = 48
-      const buttonX = DIMENSIONS.CANVAS_WIDTH / 2 - buttonWidth / 2
-      const buttonY = DIMENSIONS.CANVAS_HEIGHT / 2 + 30
+    if (state.gameOver && rendererRef.current) {
+      const buttons = rendererRef.current.getGameOverButtonCoordinates()
       
-      if (x >= buttonX && x <= buttonX + buttonWidth && y >= buttonY && y <= buttonY + buttonHeight) {
+      // Check restart button
+      if (x >= buttons.restart.x && x <= buttons.restart.x + buttons.restart.width && 
+          y >= buttons.restart.y && y <= buttons.restart.y + buttons.restart.height) {
         restartGame()
+        return
+      }
+      
+      // Check share button
+      if (x >= buttons.share.x && x <= buttons.share.x + buttons.share.width && 
+          y >= buttons.share.y && y <= buttons.share.y + buttons.share.height) {
+        handleShareScore()
         return
       }
     }
 
     jump()
-  }, [jump, restartGame])
+  }, [jump, restartGame, handleShareScore])
 
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault()
@@ -300,21 +322,26 @@ export default function SkyDash() {
 
     const state = gameStateRef.current
 
-    if (state.gameOver) {
-      // Check restart button
-      const buttonWidth = 120
-      const buttonHeight = 48
-      const buttonX = DIMENSIONS.CANVAS_WIDTH / 2 - buttonWidth / 2
-      const buttonY = DIMENSIONS.CANVAS_HEIGHT / 2 + 30
+    if (state.gameOver && rendererRef.current) {
+      const buttons = rendererRef.current.getGameOverButtonCoordinates()
       
-      if (x >= buttonX && x <= buttonX + buttonWidth && y >= buttonY && y <= buttonY + buttonHeight) {
+      // Check restart button
+      if (x >= buttons.restart.x && x <= buttons.restart.x + buttons.restart.width && 
+          y >= buttons.restart.y && y <= buttons.restart.y + buttons.restart.height) {
         restartGame()
+        return
+      }
+      
+      // Check share button
+      if (x >= buttons.share.x && x <= buttons.share.x + buttons.share.width && 
+          y >= buttons.share.y && y <= buttons.share.y + buttons.share.height) {
+        handleShareScore()
         return
       }
     }
 
     jump()
-  }, [jump, restartGame])
+  }, [jump, restartGame, handleShareScore])
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 overflow-hidden">

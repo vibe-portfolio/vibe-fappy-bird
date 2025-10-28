@@ -261,6 +261,21 @@ export class Renderer {
     }
   }
 
+  getGameOverButtonCoordinates(): { restart: { x: number, y: number, width: number, height: number }, share: { x: number, y: number, width: number, height: number } } {
+    const buttonWidth = 120
+    const buttonHeight = 48
+    const buttonSpacing = 16
+    const totalButtonsWidth = (buttonWidth * 2) + buttonSpacing
+    const restartButtonX = this.canvas.width / 2 - totalButtonsWidth / 2
+    const shareButtonX = restartButtonX + buttonWidth + buttonSpacing
+    const buttonY = this.canvas.height / 2 + 30
+    
+    return {
+      restart: { x: restartButtonX, y: buttonY, width: buttonWidth, height: buttonHeight },
+      share: { x: shareButtonX, y: buttonY, width: buttonWidth, height: buttonHeight }
+    }
+  }
+
   renderGameOverScreen(score: number): void {
     // Modern game over overlay
     const overlayGradient = this.ctx.createRadialGradient(
@@ -284,31 +299,34 @@ export class Renderer {
       this.ctx.drawImage(this.assets.gameOver, gameOverX, gameOverY, gameOverWidth, gameOverHeight)
       this.ctx.shadowBlur = 0
 
-      // Modern restart button with design system
+      // Modern buttons with design system
       const buttonWidth = 120
       const buttonHeight = 48
-      const buttonX = this.canvas.width / 2 - buttonWidth / 2
+      const buttonSpacing = 16
+      const totalButtonsWidth = (buttonWidth * 2) + buttonSpacing
+      const restartButtonX = this.canvas.width / 2 - totalButtonsWidth / 2
+      const shareButtonX = restartButtonX + buttonWidth + buttonSpacing
       const buttonY = this.canvas.height / 2 + 30
       const buttonRadius = 12
       
-      // Button gradient using theme colors
-      const buttonGradient = this.ctx.createLinearGradient(buttonX, buttonY, buttonX, buttonY + buttonHeight)
-      buttonGradient.addColorStop(0, COLORS.primary.light)
-      buttonGradient.addColorStop(1, COLORS.primary.main)
+      // Restart Button
+      const restartGradient = this.ctx.createLinearGradient(restartButtonX, buttonY, restartButtonX, buttonY + buttonHeight)
+      restartGradient.addColorStop(0, COLORS.primary.light)
+      restartGradient.addColorStop(1, COLORS.primary.main)
       
-      // Draw rounded button
-      this.ctx.fillStyle = buttonGradient
+      // Draw restart button
+      this.ctx.fillStyle = restartGradient
       this.ctx.beginPath()
-      this.ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, buttonRadius)
+      this.ctx.roundRect(restartButtonX, buttonY, buttonWidth, buttonHeight, buttonRadius)
       this.ctx.fill()
       
-      // Button glow effect
+      // Restart button glow effect
       this.ctx.shadowColor = COLORS.primary.glow
       this.ctx.shadowBlur = 12
       this.ctx.stroke()
       this.ctx.shadowBlur = 0
       
-      // Button border
+      // Restart button border
       this.ctx.strokeStyle = COLORS.neutral.white
       this.ctx.lineWidth = 2
       this.ctx.globalAlpha = 0.8
@@ -317,8 +335,8 @@ export class Renderer {
       
       // Draw restart icon (circular arrow)
       const iconSize = 20
-      const iconX = this.canvas.width / 2
-      const iconY = buttonY + buttonHeight / 2
+      const restartIconX = restartButtonX + buttonWidth / 2
+      const restartIconY = buttonY + buttonHeight / 2
       
       this.ctx.strokeStyle = COLORS.neutral.white
       this.ctx.fillStyle = COLORS.neutral.white
@@ -328,17 +346,70 @@ export class Renderer {
       
       // Draw circular arrow path (restart icon)
       this.ctx.beginPath()
-      // Main circular arc
-      this.ctx.arc(iconX, iconY, iconSize * 0.4, -Math.PI * 0.2, Math.PI * 1.5, false)
+      this.ctx.arc(restartIconX, restartIconY, iconSize * 0.4, -Math.PI * 0.2, Math.PI * 1.5, false)
       this.ctx.stroke()
       
       // Arrow head
-      const arrowX = iconX + iconSize * 0.35
-      const arrowY = iconY - iconSize * 0.2
+      const arrowX = restartIconX + iconSize * 0.35
+      const arrowY = restartIconY - iconSize * 0.2
       this.ctx.beginPath()
       this.ctx.moveTo(arrowX - 4, arrowY - 4)
       this.ctx.lineTo(arrowX + 2, arrowY)
       this.ctx.lineTo(arrowX - 4, arrowY + 4)
+      this.ctx.stroke()
+      
+      // Share Button
+      const shareGradient = this.ctx.createLinearGradient(shareButtonX, buttonY, shareButtonX, buttonY + buttonHeight)
+      shareGradient.addColorStop(0, COLORS.secondary.light)
+      shareGradient.addColorStop(1, COLORS.secondary.main)
+      
+      // Draw share button
+      this.ctx.fillStyle = shareGradient
+      this.ctx.beginPath()
+      this.ctx.roundRect(shareButtonX, buttonY, buttonWidth, buttonHeight, buttonRadius)
+      this.ctx.fill()
+      
+      // Share button glow effect
+      this.ctx.shadowColor = COLORS.secondary.glow
+      this.ctx.shadowBlur = 12
+      this.ctx.stroke()
+      this.ctx.shadowBlur = 0
+      
+      // Share button border
+      this.ctx.strokeStyle = COLORS.neutral.white
+      this.ctx.lineWidth = 2
+      this.ctx.globalAlpha = 0.8
+      this.ctx.stroke()
+      this.ctx.globalAlpha = 1
+      
+      // Draw share icon (share arrow)
+      const shareIconX = shareButtonX + buttonWidth / 2
+      const shareIconY = buttonY + buttonHeight / 2
+      
+      this.ctx.strokeStyle = COLORS.neutral.white
+      this.ctx.fillStyle = COLORS.neutral.white
+      this.ctx.lineWidth = 2.5
+      this.ctx.lineCap = 'round'
+      this.ctx.lineJoin = 'round'
+      
+      // Share icon - arrow pointing up and right
+      this.ctx.beginPath()
+      // Main line
+      this.ctx.moveTo(shareIconX - 8, shareIconY + 8)
+      this.ctx.lineTo(shareIconX + 8, shareIconY - 8)
+      this.ctx.stroke()
+      
+      // Arrow head
+      this.ctx.beginPath()
+      this.ctx.moveTo(shareIconX + 8, shareIconY - 8)
+      this.ctx.lineTo(shareIconX + 3, shareIconY - 8)
+      this.ctx.moveTo(shareIconX + 8, shareIconY - 8)
+      this.ctx.lineTo(shareIconX + 8, shareIconY - 3)
+      this.ctx.stroke()
+      
+      // Share icon - curved line (representing sharing)
+      this.ctx.beginPath()
+      this.ctx.arc(shareIconX - 4, shareIconY + 4, 6, -Math.PI / 4, Math.PI / 2, false)
       this.ctx.stroke()
       
       // Reset line properties
